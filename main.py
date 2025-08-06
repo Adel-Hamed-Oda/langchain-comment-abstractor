@@ -8,12 +8,13 @@ API_KEY = "..."
 MAIN_FONT = ("Arial", 16)
 
 root = tk.Tk()
-root.title("ah shi, here we go again")
+root.title("Langchain Comment Abstractor")
 root.geometry("800x600")
 
 headers = []
 chosen_header = ""
 filepath = ""
+original_reader
 
 def main():
     ask_for_file_button = tk.Button(text="Please choose a csv file", font=MAIN_FONT, command=ask_for_file_button_on_click)
@@ -29,14 +30,16 @@ def ask_for_file_button_on_click():
     )
 
     if (filepath):
-        with open(filepath, mode='r', newline='') as file:
-            reader = list(csv.DictReader(file))
-            global headers
-            headers = list(reader[0].keys()) if reader else []
-
-        print("Reader type:", type(reader))
-        for i, row in enumerate(reader):
-            print(f"Row {i}: {row}")
+        try:
+            with open(filepath, mode='r', newline='') as file:
+                reader = list(csv.DictReader(file))
+                global original_reader
+                original_reader = reader
+                global headers
+                headers = list(reader[0].keys()) if reader else []
+        except Exception:
+            print("Invalid file formatting, please choose a different one")
+            return
 
         setup_header_buttons()
 
@@ -65,9 +68,6 @@ def run_abstractor():
         error_label.place(x=20, y=10)
         return
 
-    processing_label = tk.Label(text="Processing...", font=("Arial", 16, ), fg="green")
-    processing_label.place(x=600, y=10)
-
     global filepath
     with open(filepath, mode='r', newline='') as file:
         reader = list(csv.DictReader(file))
@@ -90,37 +90,22 @@ def run_abstractor():
         result = read_result_into_list(model.receive())
         model.clear()
 
-        """system_msg = str(
-            "You will receive a list of strings corresponding to some abstractions about some comments. " +
-            "you should make sure that the list is returned in this format: \n" +
-            "[string1,string2,string3]\n" +
-            "if you received it in this format then keep it as is, otherwise try changing it so that it looks like this. " +
-            "don't add any extra text or commentary as the receiving system is very sensitive. " + 
-            "Please don't mess this up"
-        )
-
-        model.send(system_msg, "system")
-        model.send(result, "human")
-        model.process()"""
-
-        print("=== headers === " + str(headers))
-        print("=== chosen header === " + str(chosen_header))
-        print("=== result === " + str(result))
-        print("=== result length === " + str(len(result)))
-        print("=== original length === " + str(len(reader)))
-        print("=== comments === " + comments)
-
         if len(result) != len(reader):
+            print("Error occured during writing, retreiving original file")
             return
 
-        for i, row in enumerate(reader):
-            row[chosen_header] = result[i].strip().replace('[', '').replace(']', '').replace("'", "")
-            print("---Column :--> " + row[chosen_header])
-
-        with open(filepath, mode='w', newline='') as file:
-            writer = csv.DictWriter(file, fieldnames=headers)
-            writer.writeheader()
-            writer.writerows(reader)
+        try:
+            with open(filepath, mode='w', newline='') as file:
+                writer = csv.DictWriter(file, fieldnames=headers)
+                writer.writeheader()
+                writer.writerows(reader)
+        except Exception:
+            print("Error occured during writing, retreiving original file")
+            with open(filepath, mode='w', newline='') as file:
+                writer = csv.DictWriter(file, fieldnames=headers)
+                writer.writeheader()
+                writer.writerows(original_reader)
+            return
 
         model.clear()
         root.quit()
