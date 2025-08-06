@@ -25,7 +25,7 @@ def ask_for_file_button_on_click():
     global filepath
     filepath = filedialog.askopenfilename(
         title="Please select a CSV File",
-        filetypes=[("CSV", "*.csv"), ("All", "*.*")]
+        filetypes=[("CSV", "*.csv")]
     )
 
     if (filepath):
@@ -33,6 +33,10 @@ def ask_for_file_button_on_click():
             reader = list(csv.DictReader(file))
             global headers
             headers = list(reader[0].keys()) if reader else []
+
+        print("Reader type:", type(reader))
+        for i, row in enumerate(reader):
+            print(f"Row {i}: {row}")
 
         setup_header_buttons()
 
@@ -58,8 +62,11 @@ def setup_header_buttons():
 def run_abstractor():
     if not chosen_header:
         error_label = tk.Label(text="Please choose a header", font=("Arial", 16, ), fg="red")
-        error_label.place(x=20, y=0)
+        error_label.place(x=20, y=10)
         return
+
+    processing_label = tk.Label(text="Processing...", font=("Arial", 16, ), fg="green")
+    processing_label.place(x=600, y=10)
 
     global filepath
     with open(filepath, mode='r', newline='') as file:
@@ -73,52 +80,51 @@ def run_abstractor():
             "You will receive a list of strings corresponding to comments. " +
             "Your task is to convert each comment into a short abstraction (1-5 words). " +
             "Return the same number of items, maintaining order. " +
-            "Do not add extra text or change the format." +
+            "Do not add extra text or change the format of the list." +
             "Please don't mess this up"
         )
 
         model.send(system_msg, "system")
         model.send(comments, "human")
         model.process()
-        result = model.receive()
+        result = read_result_into_list(model.receive())
         model.clear()
 
-        system_msg = str(
+        """system_msg = str(
             "You will receive a list of strings corresponding to some abstractions about some comments. " +
-            "You will also receive a list containing all the comments themselves. " +
-            "Your job is to look at each comment in the 2nd list, and replace it with the appropriate abstraction from the first list. " +
-            "make sure you try doing this for every comment and that the result is the same length as the original list of comments. " +
-            "Do not add extra text or change the format." +
+            "you should make sure that the list is returned in this format: \n" +
+            "[string1,string2,string3]\n" +
+            "if you received it in this format then keep it as is, otherwise try changing it so that it looks like this. " +
+            "don't add any extra text or commentary as the receiving system is very sensitive. " + 
             "Please don't mess this up"
         )
 
         model.send(system_msg, "system")
         model.send(result, "human")
-        model.send(comments, "human")
-        model.process()
+        model.process()"""
 
-        result = read_result_into_list(model.receive())
+        print("=== headers === " + str(headers))
+        print("=== chosen header === " + str(chosen_header))
+        print("=== result === " + str(result))
+        print("=== result length === " + str(len(result)))
+        print("=== original length === " + str(len(reader)))
+        print("=== comments === " + comments)
 
         if len(result) != len(reader):
-            print("=== headers === " + str(headers))
-            print("=== chosen header === " + str(chosen_header))
-            print("=== result === " + str(result))
-            print("=== result length === " + str(len(result)))
-            print("=== original length === " + str(len(reader)))
-            print("=== comments === " + comments)
             return
 
         for i, row in enumerate(reader):
             row[chosen_header] = result[i].strip().replace('[', '').replace(']', '').replace("'", "")
+            print("---Column :--> " + row[chosen_header])
 
-        with open('data.csv', mode='w', newline='') as file:
+        with open(filepath, mode='w', newline='') as file:
             writer = csv.DictWriter(file, fieldnames=headers)
             writer.writeheader()
             writer.writerows(reader)
 
         model.clear()
         root.quit()
-        print("Mission Successful")
+        print("Abstraction Successful")
 
 def read_result_into_list(result):
     if isinstance(result, list):
